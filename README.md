@@ -178,17 +178,17 @@ Scored these vintage Levi's 501 jeans on Depop for just $38 and they give off th
      "I gave Claude my search_listings spec. It returned None on no match
      instead of an empty list, so I changed it" is the level we want. -->
 
-**Moment 1**
+**Moment 1: the size filter in `search_listings`**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I gave Claude my size rules for the spec: `S/M` should match a search for `S` or `M`, a search for `8` should not match `8.5`, and the price ceiling is inclusive. Then I asked it to build `search_listings` from that spec.
+- *What came back:* A filter that splits sizes into whole-word tokens with a regex (`"S/M"` → `{s, m}`, `"US 8.5"` → `{us, 8.5}`) instead of a substring test, so `"s"` no longer matches `"US 9"`. It also proposed that `One Size` never matches a size request. When we tested it, the size filter was correct for `S`, `M`, `L`, `8` and `W30`, but a search for `'graphic tee'` also returned low-rise cargo pants, because their description says "great for layering with a long tee".
+- *What I changed:* I didn't understand why `re` was imported, so I asked. I learned that the regex keeps `8.5` as one token, and that's what makes my "8 is not 8.5" rule work. Without it, `"US 8.5"` would split into `8` and `5` and match a size-8 search. I kept the cargo-pants result instead of patching it: it ranks below the real tees, and it shows a real limit of keyword scoring (it can't tell "is a tee" from "goes with a tee"). I'll come back to that in unit 4.
 
-**Moment 2**
+**Moment 2: parsing the query in `run_agent`**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* For Milestone 5, I asked Claude to wire the loop, which meant turning a sentence like `'vintage graphic tee under $30, size S/M'` into a description, a size and a max price before calling `search_listings`.
+- *What came back:* `parse_query` in `agent.py`, which uses regex rather than asking the model. One pattern finds the price (`$30`, `under $30`, `under 30`), one finds the size (`size M`, `size S/M`, `size 8`, `size US 8.5`, `size W30 L30`), and whatever is left after cutting those and filler like "looking for a" becomes the description. Tested on the six example queries plus three harder ones, it parsed all nine correctly, including `'boots size US 8.5'` → size `US 8.5`.
+- *What I changed:* I kept regex instead of a model call: it costs no requests, gives the same answer every time, and I can test it on its own. I also wrote down its limits rather than hiding them. It can't read "30 bucks" or "sz M". Those words stay in the description and aren't used as filters, so the search runs without the ceiling and nothing warns the user. That's exactly the "some phrasings will miss" risk in my criterion 1 reason, and it's why that target is 4 of 5, not 5 of 5. One behavior I noticed and decided to keep: asking for `S/M` only matches listings sized `S/M`, because my size rule needs every requested token to match.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
