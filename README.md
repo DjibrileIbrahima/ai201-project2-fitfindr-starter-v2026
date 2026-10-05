@@ -59,24 +59,31 @@
 
 ### `search_listings`
 
-- **What it does:**
-- **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Filters the 40 listings in `data/listings.json` by price ceiling and size, then ranks what's left by how many words from the description appear in each listing's title, description, category and style tags. It does not call the model.
+- **Inputs:**
+  - `description` (str): keywords for what the user wants, e.g. `"vintage graphic tee"`
+  - `size` (str | None): size to filter by, matched case-insensitively against whole size tokens, not substrings. `"M"` matches `M`, `S/M` and `M/L` but not `W30 L30`. `"8"` matches `US 8` but not `US 8.5`. `One Size` listings never match a size request. `None` skips size filtering.
+  - `max_price` (float | None): inclusive price ceiling. `30.0` keeps a $30.00 item. `None` skips price filtering.
+- **Returns:** A `list[dict]` of at most `config.SEARCH_RESULT_LIMIT` (10) listing dicts, highest keyword score first. Each dict has `id`, `title`, `description`, `category`, `style_tags` (list), `size`, `condition`, `price` (float), `colors` (list), `brand` (str or None) and `platform`.
+- **When it has nothing:** Returns an empty list `[]`, never `None` and never an exception. This happens when no listing passes the price and size filters with a keyword score above zero. The loop branches on this.
 
 ### `suggest_outfit`
 
-- **What it does:**
+- **What it does:** Sends the thrifted item and the user's wardrobe to the model (through `generate()`) and asks for one outfit built around the item.
 - **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+  - `new_item` (dict): one listing dict, the item selected from the search results
+  - `wardrobe` (dict): a dict with an `items` key holding a list of wardrobe item dicts (`id`, `name`, `category`, `colors`, `style_tags`, `notes`). The list may be empty.
+- **Returns:** A non-empty `str` holding **one** outfit as a numbered list, one piece per line. The new item is one line, and every other line names a piece from the wardrobe exactly as its `name` field is written (e.g. "Chunky white sneakers").
+- **When it has nothing:** If `wardrobe["items"]` is empty, it still returns a non-empty `str`: one outfit as a numbered list of general piece types (e.g. "white sneakers"), with no claim that the user owns them. It never returns `""` or `None`. If the model can't be reached, it doesn't catch the error. `ModelUnavailable` propagates to the loop.
 
 ### `create_fit_card`
 
-- **What it does:**
+- **What it does:** Sends the item and the outfit to the model (through `generate()`) and asks for a short caption someone would actually post about the find.
 - **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+  - `outfit` (str): the outfit string returned by `suggest_outfit`
+  - `new_item` (dict): the same listing dict passed to `suggest_outfit`
+- **Returns:** A `str` caption of exactly two short sentences, written like a social post rather than a product description. It mentions the item's `title`, `price` (as `$NN`) and `platform` once each, and mentions the `brand` only when it isn't `None`.
+- **When it has nothing:** If `outfit` is empty or whitespace-only, it returns the exact string `"Couldn't write a fit card: no outfit suggestion was provided."` without calling the model and without raising. If the model can't be reached, `ModelUnavailable` propagates to the loop.
 
 ---
 
