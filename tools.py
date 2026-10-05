@@ -161,8 +161,49 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
     Test it from a terminal before you move on:
         python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
     """
-    # TODO: replace this with your implementation
-    return ""
+    items = wardrobe.get("items") or []
+
+    if items:
+        owned = "\n".join(
+            f"- {w['name']} ({w['category']}; {', '.join(w['colors'])})" for w in items
+        )
+        prompt = (
+            f"I just thrifted this item:\n{_describe_item(new_item)}\n\n"
+            f"These are the clothes I already own:\n{owned}\n\n"
+            "Build ONE outfit around the thrifted item. Write it as a numbered "
+            "list, one piece per line. Line 1 is the thrifted item. Every other "
+            "line must be a piece from my list, copied exactly as it is written "
+            "before the brackets. Don't add anything I don't own. Don't write "
+            "anything before or after the list."
+        )
+    else:
+        prompt = (
+            f"I just thrifted this item:\n{_describe_item(new_item)}\n\n"
+            "I haven't told you what else I own. Build ONE outfit around the "
+            "thrifted item. Write it as a numbered list, one piece per line. "
+            "Line 1 is the thrifted item. Every other line is a general kind of "
+            "piece (like 'white sneakers'), not a specific product, and don't "
+            "say or imply that I own it. Don't write anything before or after "
+            "the list."
+        )
+
+    response = generate(prompt).strip()
+    if not response:
+        # The spec promises a non-empty string, even if the model sends nothing.
+        return f"1. {new_item['title']}"
+    return response
+
+
+def _describe_item(item: dict) -> str:
+    """The listing in a few lines. Brand only when there is one — most have none."""
+    lines = [
+        f"{item['title']} ({item['category']})",
+        f"Colors: {', '.join(item['colors'])}",
+        f"Style: {', '.join(item['style_tags'])}",
+    ]
+    if item.get("brand"):
+        lines.append(f"Brand: {item['brand']}")
+    return "\n".join(lines)
 
 
 # ── Tool 3: create_fit_card ───────────────────────────────────────────────────

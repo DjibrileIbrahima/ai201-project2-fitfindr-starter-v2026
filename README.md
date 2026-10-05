@@ -132,8 +132,12 @@ $ python -c "from tools import search_listings; print(search_listings('graphic t
 ```
 
 ```
-$ python -c "from tools import suggest_outfit; ..."
-
+$ python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
+1. Vintage Levi's 501 Jeans — Medium Wash
+2. White ribbed tank top
+3. Vintage black denim jacket
+4. Chunky white sneakers
+5. Black crossbody bag
 ```
 
 ```
