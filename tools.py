@@ -242,5 +242,29 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
     Test it from a terminal before you move on:
         python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
     """
-    # TODO: replace this with your implementation
-    return ""
+    if not outfit or not outfit.strip():
+        return "Couldn't write a fit card: no outfit suggestion was provided."
+
+    brand_rule = (
+        f"Mention the brand, {new_item['brand']}, once. "
+        if new_item.get("brand") else
+        "There is no brand, so don't mention one. "
+    )
+    prompt = (
+        f"I just thrifted this:\n{_describe_item(new_item)}\n"
+        f"Price: {_price(new_item['price'])}\n"
+        f"Platform: {new_item['platform']}\n\n"
+        f"I'm wearing it like this:\n{outfit}\n\n"
+        "Write the caption I'd post about this find. Exactly two short "
+        "sentences, casual, like a real post rather than a product description, "
+        "and specific about the vibe. Mention the item's name, the price written "
+        f"exactly as {_price(new_item['price'])}, and the platform once each. "
+        f"{brand_rule}"
+        "Write only the caption."
+    )
+    return generate(prompt).strip()
+
+
+def _price(price: float) -> str:
+    """38.0 -> '$38', 12.5 -> '$12.50'."""
+    return f"${price:.0f}" if price == int(price) else f"${price:.2f}"

@@ -141,8 +141,8 @@ $ python -c "from tools import suggest_outfit; from utils.data_loader import get
 ```
 
 ```
-$ python -c "from tools import create_fit_card; ..."
-
+$ python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
+Scored these vintage Levi's 501 jeans on Depop for just $38 and they give off the ultimate effortless streetwear vibe with my white sneakers.
 ```
 
 ---
