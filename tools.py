@@ -20,7 +20,9 @@ That last line is what your loop branches on. "Returns a list" earns nothing —
 the description has to say what is *in* the list.
 """
 
-import config  # noqa: F401 — you'll use this in search_listings
+import re
+
+import config
 from generate import generate
 from utils.data_loader import load_listings
 
@@ -78,8 +80,55 @@ def search_listings(
     Test it from a terminal before you move on:
         python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
     """
-    # TODO: replace this with your implementation
-    return []
+    listings = load_listings()
+
+    if max_price is not None:
+        listings = [l for l in listings if l["price"] <= max_price]
+
+    if size:
+        wanted = _tokens(size)
+        listings = [l for l in listings if _size_matches(wanted, l["size"])]
+
+    query_words = _tokens(description) - _STOPWORDS
+    if not query_words:
+        return []
+
+    scored = []
+    for listing in listings:
+        text = " ".join([
+            listing["title"],
+            listing["description"],
+            listing["category"],
+            " ".join(listing["style_tags"]),
+        ])
+        score = len(query_words & _tokens(text))
+        if score > 0:
+            scored.append((score, listing))
+
+    # sorted() is stable, so equal scores keep the order they have in the file
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [listing for _, listing in scored[:config.SEARCH_RESULT_LIMIT]]
+
+
+# Words that say nothing about the item, so they shouldn't earn a listing a point.
+_STOPWORDS = {"a", "an", "the", "and", "or", "for", "in", "with", "of", "some",
+              "looking", "want", "need", "size", "under", "below", "less", "than"}
+
+
+def _tokens(text: str) -> set[str]:
+    """Lowercase whole words. 'S/M' -> {'s', 'm'}, 'US 8.5' -> {'us', '8.5'}."""
+    return set(re.findall(r"[a-z0-9]+(?:\.[0-9]+)?", text.lower()))
+
+
+def _size_matches(wanted: set[str], listing_size: str) -> bool:
+    """
+    Every token of the requested size has to be a whole token of the listing's
+    size. Whole tokens, not substrings: 'S' matches 'S/M' but not 'US 9', and
+    '8' matches 'US 8' but not 'US 8.5'. 'One Size' never matches a request.
+    """
+    if listing_size.lower().startswith("one size"):
+        return False
+    return wanted <= _tokens(listing_size)
 
 
 # ── Tool 2: suggest_outfit ────────────────────────────────────────────────────
