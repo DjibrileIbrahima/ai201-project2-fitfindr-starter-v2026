@@ -41,6 +41,7 @@
 
 <!-- Three or four sentences: what a user asks for, and what they get back. -->
 
+FitFindr takes a plain-language thrift request like `'vintage graphic tee under $30, size M'` and searches 40 secondhand listings for the best match within that size and price. It then builds one outfit around the item using pieces from the user's own wardrobe, or general pieces if their wardrobe is empty. Finally it writes a two-sentence caption they could post about the find, naming the item, its price and the platform. If nothing matches, it stops before any of that and tells the user which part of the request to loosen.
 
 
 ---
@@ -100,13 +101,13 @@
      The grader checks your code against what you claim here, so the file and
      function have to be real. -->
 
-**Branch rule:**
+**Branch rule:** If `search_listings` returns an empty list, put a message in `session["error"]` naming the search and what to loosen (drop the size, raise the price limit, or use broader words), and return the session without calling `suggest_outfit` or `create_fit_card`. Otherwise take the first (highest-scoring) result as `session["selected_item"]` and go to `suggest_outfit`, then `create_fit_card`.
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** Regex, in `agent.py::parse_query`. One pattern finds the price (`$30`, `under $30`, `under 30`), another finds the size (`size M`, `size S/M`, `size 8`, `size US 8.5`, `size W30 L30`). Both are cut out of the query, filler words like "looking for a" are removed, and what's left is the description. A phrasing the patterns don't cover, like "30 bucks", is left in the description and not used as a filter.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session:** In order: `query` → `parsed` (`description`, `size`, `max_price`) → `search_results` → `selected_item` (= `search_results[0]`) → `outfit_suggestion` → `fit_card`. Each tool reads its input from the session, not from a local variable: `suggest_outfit` gets `session["selected_item"]` and `session["wardrobe"]`, and `create_fit_card` gets `session["outfit_suggestion"]` and `session["selected_item"]`. `error` stays `None` unless the branch stops the run, and then the later fields stay `None`.
 
 ---
 
@@ -120,8 +121,29 @@
 **One full query**
 
 ```
-$ python app.py ask '...'
+$ python app.py ask 'vintage graphic tee under $30'
 
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   1. Y2K Baby Tee — Butterfly Print
+2. Baggy straight-leg jeans, dark wash
+3. Black cropped zip hoodie
+4. Chunky white sneakers
+5. Black crossbody bag
+
+  Fit card: Scored this butterfly baby tee for just $18 on depop, and it totally nails that ultimate Y2K mall-goth look. Pairing it with baggy denim and my favorite hoodie makes the whole outfit come together effortlessly.
+
+0 model calls this session, 2 served from cache
+```
+
+**The empty-search branch**
+
+```
+$ python app.py ask 'designer ballgown size XXS under $5'
+
+  Nothing matched 'designer ballgown' in size XXS under $5. You could drop the size, or raise the price limit, or try broader words, like 'jacket' instead of a specific style.
+
+0 model calls this session
 ```
 
 **The three tools, tested one at a time**

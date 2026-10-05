@@ -13,6 +13,8 @@ Build and test your three tools in `tools.py` first. Then come here.
     python agent.py          runs both example paths below
 """
 
+import re
+
 import config
 import trace
 from tools import search_listings, suggest_outfit, create_fit_card
@@ -106,10 +108,91 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         than a stack trace. The import is already at the top of this file.
     """
     session = new_session(query, wardrobe)
+    steps = 0
 
-    # TODO: delete these two lines and build the loop.
-    session["error"] = "The planning loop isn't built yet — see the TODO in agent.py."
+    # Step 1: parse the query.
+    steps += 1
+    trace.check_iterations(steps)
+    session["parsed"] = parse_query(query)
+    parsed = session["parsed"]
+
+    # Step 2: search.
+    steps += 1
+    trace.check_iterations(steps)
+    session["search_results"] = search_listings(
+        parsed["description"], size=parsed["size"], max_price=parsed["max_price"]
+    )
+
+    # THE BRANCH: nothing found means stop here, before any model call.
+    if not session["search_results"]:
+        session["error"] = _no_results_message(parsed)
+        return session
+
+    # Step 3: choose the best match, then style it.
+    steps += 1
+    trace.check_iterations(steps)
+    session["selected_item"] = session["search_results"][0]
+    session["outfit_suggestion"] = suggest_outfit(
+        session["selected_item"], session["wardrobe"]
+    )
+
+    # Step 4: write the fit card from what the session now holds.
+    steps += 1
+    trace.check_iterations(steps)
+    session["fit_card"] = create_fit_card(
+        session["outfit_suggestion"], session["selected_item"]
+    )
+
     return session
+
+
+# ── query parsing ─────────────────────────────────────────────────────────────
+
+# "$30", "under $30", "under 30", "below 30.50"
+_PRICE = re.compile(r"(?:(?:under|below|less than|max)\s*\$?|\$)\s*(\d+(?:\.\d+)?)", re.I)
+# "size M", "size S/M", "size 8", "size US 8.5", "size W30 L30"
+_SIZE = re.compile(r"\bsize\s+((?:us\s+)?\d+(?:\.\d+)?|w\d+(?:\s+l\d+)?|[a-z]+(?:/[a-z]+)?)\b", re.I)
+# Words left over after the price and size are cut out that say nothing about the item
+_FILLER = re.compile(r"\b(?:i'?m|looking|for|want|need|a|an|some|in|please)\b", re.I)
+
+
+def parse_query(query: str) -> dict:
+    """
+    Pull a description, a size and a max_price out of plain language, with
+    regex. Anything that isn't the price or the size is the description.
+
+        "vintage graphic tee under $30, size M"
+            -> {"description": "vintage graphic tee", "size": "M", "max_price": 30.0}
+    """
+    price_match = _PRICE.search(query)
+    size_match = _SIZE.search(query)
+
+    rest = query
+    for match in (price_match, size_match):
+        if match:
+            rest = rest.replace(match.group(0), " ")
+    rest = _FILLER.sub(" ", rest)
+    description = " ".join(re.sub(r"[^\w\s'-]", " ", rest).split())
+
+    return {
+        "description": description,
+        "size": size_match.group(1) if size_match else None,
+        "max_price": float(price_match.group(1)) if price_match else None,
+    }
+
+
+def _no_results_message(parsed: dict) -> str:
+    """Say what the user searched for and which part they could loosen."""
+    searched = f"'{parsed['description']}'"
+    ideas = []
+    if parsed["size"]:
+        searched += f" in size {parsed['size']}"
+        ideas.append("drop the size")
+    if parsed["max_price"] is not None:
+        searched += f" under ${parsed['max_price']:g}"
+        ideas.append("raise the price limit")
+    ideas.append("try broader words, like 'jacket' instead of a specific style")
+    return f"Nothing matched {searched}. You could " + ", or ".join(ideas) + "."
 
 
 # ── running it directly ───────────────────────────────────────────────────────
