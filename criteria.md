@@ -25,9 +25,12 @@ Given a query that matches at least one listing, the agent completes all three
 tool calls and returns a fit card — in at least 4 of 5 tries.
 
 **Why this target:**
-<!-- Why 4 of 5 and not 5 of 5? Something about your search, probably —
-     "my search is a plain keyword match and some phrasings will miss" is a
-     real answer. -->
+Two things on this path are outside a plain `if`. My query parser is a regex,
+so a phrasing it doesn't expect ("under 30 bucks", "sz M") can produce wrong
+filters and an empty search on a query that should match. And two of the three
+tools call the model, so a rate limit or timeout can end a run early. One miss
+in five allows for that; two would mean the parser or the error handling is
+broken.
 
 ---
 
@@ -37,65 +40,58 @@ Given a query that matches no listings, the agent stops before calling
 `suggest_outfit` and returns a message naming what to change — 5 of 5 tries.
 
 **Why this target:**
-<!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
-     about this path? -->
+This path never reaches the model. `search_listings` is a plain Python filter
+over a fixed file, so the same query returns the same `[]` every time, and the
+branch is a single check on that list. Nothing on the path is random, so any
+miss is a bug in my code, not bad luck.
 
 ---
 
-## 3. Something about state
+## 3. The searched item is the item every later tool receives
 
-<!-- YOU WRITE THIS ONE.
-
-     How would you know that the item your search found is the same item the
-     next tool received? Name something countable or observable.
-
-     This is the criterion people find hardest, because state failure doesn't
-     look like state failure — it looks like a tool problem. Something that
-     compares session["selected_item"] against what actually reached
-     suggest_outfit is the shape you're after. -->
-
-
+Given a query that matches, the listing passed to `suggest_outfit` has the same
+`id` as `session["selected_item"]`, and that `id` equals
+`session["search_results"][0]["id"]` — in 5 of 5 tries.
 
 **Why this target:**
-
-
+Moving the item from search to the next tool is plain assignment through the
+session dict, with no model involved. If the ids ever differ, I've overwritten
+or mixed up a session field, which is a bug, not variance. It also has to be
+5 of 5 because a state mix-up wouldn't look like one: it would look like
+`suggest_outfit` styling the wrong item, and I'd go blaming the prompt.
 
 ---
 
-## 4. Something about the fit card
+## 4. The fit card names the price and platform in two sentences
 
-<!-- YOU WRITE THIS ONE.
-
-     The fit card calls a model, so the same input can produce different words
-     each time. That's not a bug — it's the nature of the tool. So what would
-     make it acceptable?
-
-     Think about what you'd actually be unhappy to see. A caption that never
-     mentions the price? Two different items producing the same opening
-     sentence? A card longer than a caption anyone would post? Any of those can
-     be turned into a number. -->
-
-
+Given a query that matches, the fit card contains the selected item's price
+written as `$NN`, contains its `platform` name, and is exactly two sentences —
+in at least 4 of 5 tries.
 
 **Why this target:**
-
-
+These are the facts that make it a post about *this* find rather than a generic
+caption, and price and platform are present on all 40 listings, so the card
+never has an excuse to skip them. Not 5 of 5 because the model runs at
+temperature 0.9 and can drop a detail or add a third sentence. "Exactly two
+sentences" is the part I expect to slip. More than one miss would mean my
+prompt isn't stating the rules clearly enough.
 
 ---
 
-## 5. Your choice
+## 5. The size filter never returns the wrong size
 
-<!-- YOU WRITE THIS ONE TOO.
-
-     Pick something you actually care about getting right. Speed, the empty
-     wardrobe path, what happens when the model can't be reached, whether the
-     search respects a price ceiling — anything, as long as it names a number
-     or an observable outcome. -->
-
-
+For five size queries — `S`, `M`, `L`, `8` and `W30` — every listing that
+`search_listings` returns has the requested size as a whole token of its `size`
+field: `S/M` counts for `S`, `US 9` does not, and `US 8.5` does not count for
+`8` — in 5 of 5 queries.
 
 **Why this target:**
-
+The data mixes four size systems (letters, `US` shoe sizes, `W`/`L` waists,
+`One Size`), and a substring test fails on exactly these cases: `"s" in "us 9"`
+is True and `"8" in "us 8.5"` is True. My filter compares whole tokens, which
+is deterministic, so anything under 5 of 5 means the tokenizing is wrong. A
+wrong size in the results reads to the user as a broken search, even though
+every other part of the agent worked.
 
 
 ---
