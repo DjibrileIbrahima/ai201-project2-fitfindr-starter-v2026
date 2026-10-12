@@ -285,6 +285,7 @@ that produced it:
 behaved differently afterwards. If the rewire didn't work, say exactly where it
 broke — the error text and the last thing that worked. That earns the point in
 full. -->
+I registered `search_listings` in `mcp_server.py`, with a two-sentence description written for an agent that can't see my code: the price unit (USD, inclusive), the 10-result cap, and `[]` when nothing matches. My first draft was three paragraphs. It listed every field in a result and spelled out the size-matching rule with examples. I cut it down, because the type hints already publish the inputs, and the starter asks for one or two sentences. In `agent.py::run_agent`, the direct `search_listings(...)` call became `call_tool("search_listings", {...})`. Nothing else in the loop changed. `python mcp_client.py` lists the tool with `description: string` required and `size: string`, `max_price: number` optional, which matches my Tool Inventory. I compared the direct call against the MCP call on five queries (graphic tee ≤ $30, leather cowboy boots size US 12, track jacket size M, sneakers size 8, jeans W30). All five returned identical lists, including the empty one. That was the case I was watching, because the client turns empty text into `None`. It came back as `[]`, a real list, so the branch and criterion 2 behave exactly as before. The only visible difference is speed. Each call starts a new server process, so a search went from about 2 ms direct to 1.6–2.7 s over MCP (three timed calls). That's fine next to the model calls, but it's the cost of the seam.
 
 
 
