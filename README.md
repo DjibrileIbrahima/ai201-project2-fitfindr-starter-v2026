@@ -272,13 +272,55 @@ that produced it:
 **Happy path**
 
 ```
-
+$ python app.py ask 'vintage graphic tee under $30' --trace
+[1] parse_query
+      in:  vintage graphic tee under $30
+      out: description='vintage graphic tee', size=None, max_price=30.0
+[2] search_listings (via MCP)
+      in:  description='vintage graphic tee', size=None, max_price=30.0
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+      →    branch: results found, taking the first
+[3] suggest_outfit
+      in:  lst_002 Y2K Baby Tee — Butterfly Print, wardrobe: 10 items
+      out: 1. Y2K Baby Tee — Butterfly Print 2. Baggy straight-leg jeans, dark wash 3. Black cropped zip hoodie 4. Chunky…
+[4] create_fit_card
+      in:  lst_002 Y2K Baby Tee — Butterfly Print, outfit: 148 chars
+      out: Scored this butterfly baby tee for just $18 on depop, and it totally nails that ultimate Y2K mall-goth look. P…
 ```
 
 **Empty search**
 
 ```
+$ python app.py ask 'leather cowboy boots size US 12' --trace
+[1] parse_query
+      in:  leather cowboy boots size US 12
+      out: description='leather cowboy boots', size='US 12', max_price=None
+[2] search_listings (via MCP)
+      in:  description='leather cowboy boots', size='US 12', max_price=None
+      out: [] (empty)
+      →    branch: empty, stopping before suggest_outfit
 
+  Nothing matched 'leather cowboy boots' in size US 12. You could drop the size, or try broader words, like 'jacket' instead of a specific style.
+
+0 model calls this session
+```
+
+**Model unreachable** (a fake `GEMINI_API_KEY` set for one command, cache off)
+
+```
+$ python app.py ask '90s track jacket in size M' --trace
+[1] parse_query
+      in:  90s track jacket in size M
+      out: description='90s track jacket', size='M', max_price=None
+[2] search_listings (via MCP)
+      in:  description='90s track jacket', size='M', max_price=None
+      out: 4 items: 90s Track Jacket — Navy/White Stripe, 90s Leather Bomber — Black, 90s Silk Slip Dress — Floral, Midi Length … +1 more
+      →    branch: results found, taking the first
+[3] suggest_outfit
+      out: ModelUnavailable
+      →    model unreachable: stopping with a message
+
+  Found 90s Track Jacket — Navy/White Stripe ($45 on poshmark), but couldn't reach the model to run suggest_outfit, so there's no outfit or fit card this time. The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.
 ```
 
 **On the MCP move:** <!-- what changed in your code, and whether anything

@@ -116,6 +116,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     trace.check_iterations(steps)
     session["parsed"] = parse_query(query)
     parsed = session["parsed"]
+    trace.step("parse_query", inputs=query, returned=_fmt(parsed))
 
     # Step 2: search.
     steps += 1
@@ -130,23 +131,67 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     # THE BRANCH: nothing found means stop here, before any model call.
     if not session["search_results"]:
         session["error"] = _no_results_message(parsed)
+        trace.step("search_listings (via MCP)", inputs=_fmt(parsed),
+                   returned=session["search_results"],
+                   note="branch: empty, stopping before suggest_outfit")
         return session
+    trace.step("search_listings (via MCP)", inputs=_fmt(parsed),
+               returned=session["search_results"],
+               note="branch: results found, taking the first")
 
     # Step 3: choose the best match, then style it.
     steps += 1
     trace.check_iterations(steps)
     session["selected_item"] = session["search_results"][0]
-    session["outfit_suggestion"] = suggest_outfit(
-        session["selected_item"], session["wardrobe"]
-    )
+    wardrobe_size = len(session["wardrobe"].get("items") or [])
+    try:
+        session["outfit_suggestion"] = suggest_outfit(
+            session["selected_item"], session["wardrobe"]
+        )
+    except ModelUnavailable as exc:
+        return _model_failed(session, "suggest_outfit", exc)
+    trace.step("suggest_outfit",
+               inputs=f"{_item_label(session['selected_item'])}, "
+                      f"wardrobe: {wardrobe_size} items",
+               returned=session["outfit_suggestion"],
+               note="" if wardrobe_size else "empty wardrobe: general pieces")
 
     # Step 4: write the fit card from what the session now holds.
     steps += 1
     trace.check_iterations(steps)
-    session["fit_card"] = create_fit_card(
-        session["outfit_suggestion"], session["selected_item"]
-    )
+    try:
+        session["fit_card"] = create_fit_card(
+            session["outfit_suggestion"], session["selected_item"]
+        )
+    except ModelUnavailable as exc:
+        return _model_failed(session, "create_fit_card", exc)
+    trace.step("create_fit_card",
+               inputs=f"{_item_label(session['selected_item'])}, "
+                      f"outfit: {len(session['outfit_suggestion'])} chars",
+               returned=session["fit_card"])
 
+    return session
+
+
+def _fmt(parsed: dict) -> str:
+    """The parsed query on one line, values and all, for the trace."""
+    return ", ".join(f"{k}={v!r}" for k, v in parsed.items())
+
+
+def _item_label(item: dict) -> str:
+    return f"{item['id']} {item['title']}"
+
+
+def _model_failed(session: dict, tool: str, exc: ModelUnavailable) -> dict:
+    """The model couldn't be reached. Keep what worked, and say what didn't."""
+    item = session["selected_item"]
+    session["error"] = (
+        f"Found {item['title']} (${item['price']:g} on {item['platform']}), but "
+        f"couldn't reach the model to run {tool}, so there's no outfit or fit "
+        f"card this time. {exc}"
+    )
+    trace.step(tool, returned="ModelUnavailable",
+               note="model unreachable: stopping with a message")
     return session
 
 
