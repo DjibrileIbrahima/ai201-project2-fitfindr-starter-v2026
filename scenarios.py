@@ -65,6 +65,20 @@ SCENARIOS = [
         "criterion": 5,
     },
     {
+        # Diagnostic for the improvement (Milestone 5). create_fit_card called
+        # directly with a short outfit — the README Sample Run input that gave
+        # a one-sentence card in unit 3. The loop always passes a full outfit,
+        # so criterion 4 can't see this case. PASS when the card has $38,
+        # "depop" and exactly two sentences, the same test as criterion 4.
+        "name": "fit card from a short outfit",
+        "tool": "create_fit_card",
+        "outfit": "jeans and white sneakers",
+        "item_id": "lst_001",
+        "query": "create_fit_card('jeans and white sneakers', lst_001) — direct, no loop",
+        "wardrobe": "example",
+        "criterion": None,
+    },
+    {
         # A user with nothing saved. One of unit 4's three failure modes.
         "name": "empty wardrobe",
         "query": "denim jacket under $50",

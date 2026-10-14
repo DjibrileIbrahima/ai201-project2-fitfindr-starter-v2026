@@ -47,6 +47,31 @@ def query_for(scenario, attempt):
     return queries[(attempt - 1) % len(queries)] if queries else scenario["query"]
 
 
+def _fit_card_only(scenario, wardrobe):
+    """
+    Call create_fit_card directly with a fixed outfit, skipping the loop.
+
+    The loop always hands create_fit_card a full numbered outfit, so it can't
+    reproduce what happens with a short one. This puts the result in a normal
+    session dict so the report reads the same as every other scenario.
+    """
+    from agent import new_session
+    from tools import create_fit_card
+    from utils.data_loader import load_listings
+    import trace as trace_module
+
+    item = next(l for l in load_listings() if l["id"] == scenario["item_id"])
+    session = new_session(scenario["query"], wardrobe)
+    session["search_results"] = [item]
+    session["selected_item"] = item
+    session["outfit_suggestion"] = scenario["outfit"]
+    session["fit_card"] = create_fit_card(scenario["outfit"], item)
+    trace_module.step("create_fit_card (direct, no loop)",
+                      inputs=f"{item['id']} {item['title']}, outfit: {scenario['outfit']!r}",
+                      returned=session["fit_card"])
+    return session
+
+
 def run_once(scenario, attempt=1, use_trace=True):
     """One scenario, one try. Returns everything worth recording."""
     from agent import run_agent
@@ -63,7 +88,10 @@ def run_once(scenario, attempt=1, use_trace=True):
     record = {"error": None, "session": None, "trace": "", "crashed": None,
               "query": query_for(scenario, attempt)}
     try:
-        record["session"] = run_agent(record["query"], wardrobe)
+        if scenario.get("tool") == "create_fit_card":
+            record["session"] = _fit_card_only(scenario, wardrobe)
+        else:
+            record["session"] = run_agent(record["query"], wardrobe)
     except Exception as exc:  # noqa: BLE001 — a crash is a result worth logging
         record["crashed"] = f"{type(exc).__name__}: {exc}"
         record["traceback"] = traceback.format_exc()
@@ -79,7 +107,17 @@ def main():
     parser.add_argument("--tries", "--trials", type=int, default=5, dest="tries",
                         help="tries per scenario (default 5, matching your criteria)")
     parser.add_argument("--label", default="", help="a name for this run, e.g. 'before'")
+    parser.add_argument("--only", default="",
+                        help="run just the scenario with this name")
     args = parser.parse_args()
+
+    if args.only:
+        scenario_module.SCENARIOS = [
+            s for s in scenario_module.SCENARIOS if s["name"] == args.only
+        ]
+        if not scenario_module.SCENARIOS:
+            print(f"No scenario named {args.only!r} in scenarios.py.", file=sys.stderr)
+            sys.exit(1)
 
     problems = scenario_module.validate()
     if problems:
