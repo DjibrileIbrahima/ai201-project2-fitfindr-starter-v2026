@@ -255,10 +255,15 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
         f"Price: {_price(new_item['price'])}\n"
         f"Platform: {new_item['platform']}\n\n"
         f"I'm wearing it like this:\n{outfit}\n\n"
-        "Write the caption I'd post about this find. Exactly two short "
-        "sentences, casual, like a real post rather than a product description, "
-        "and specific about the vibe. Mention the item's name, the price written "
-        f"exactly as {_price(new_item['price'])}, and the platform once each. "
+        # Each sentence gets a job. "Exactly two sentences" alone wasn't enough:
+        # with a short outfit there was little for a second sentence to say, and
+        # the model joined everything with "and" into one (3 of 5 before).
+        "Write the caption I'd post about this find: exactly two sentences, "
+        "casual, like a real post rather than a product description.\n"
+        "Sentence 1 is the find: the item's name, the price written exactly as "
+        f"{_price(new_item['price'])}, and the platform.\n"
+        "Sentence 2 is how I'm wearing it and the vibe, using the outfit.\n"
+        "End each sentence with a full stop. Don't join them into one. "
         f"{brand_rule}"
         "Write only the caption."
     )

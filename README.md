@@ -354,24 +354,31 @@ I registered `search_listings` in `mcp_server.py`, with a two-sentence descripti
 
      `python run_eval.py --label after` -->
 
-**What I changed:**
+**What I changed:** One prompt, in `tools.py::create_fit_card`. The old prompt asked for "exactly two short sentences" but didn't say what either sentence was for. The new one gives each sentence a job: *"Sentence 1 is the find: the item's name, the price written exactly as $38, and the platform. Sentence 2 is how I'm wearing it and the vibe, using the outfit. End each sentence with a full stop. Don't join them into one."* Nothing else in the tool or the loop changed.
 
-**Which failure it was meant to fix:**
+**Which failure it was meant to fix:** Diagnosis 1, the one-sentence caption. It never showed inside the loop, because the loop always passes a full numbered outfit. So I added a diagnostic scenario that calls `create_fit_card` directly with the short outfit from my unit 3 Sample Run (`'jeans and white sneakers'` on `lst_001`, the Levi's 501s at $38 on depop). I measured it **before** changing the prompt and committed that log first ([results/run_2026-10-14_0246_before-short.md](results/run_2026-10-14_0246_before-short.md)). It scored 3 of 5 against criterion 4's test ($NN, platform, two sentences). Tries 1 and 5 were one long sentence joined with "and", the same shape as in unit 3. The place is the model's output; the mechanism is that a short outfit left the second sentence with nothing of its own to say, and "two sentences" wasn't specific enough to stop the model merging them.
 
 ### Run Log — After
 
+Full log: [results/run_2026-10-14_1800_after.md](results/run_2026-10-14_1800_after.md). Cache off, temperature 0.9, 55 model calls.
+
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. A matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. An impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. The searched item is the item every later tool receives | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. The fit card names the price and platform in two sentences | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. The size filter never returns the wrong size | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| Fit card from a short outfit _(diagnostic, criterion 4's test)_ | 4 of 5 | PASS | PASS | PASS | PASS | PASS | 5/5 (before: 3/5) |
 
 **Did it help, and how do I know:**
 
 <!-- If it made things worse, say that. Honestly reported, that earns full
      credit and is more interesting than one that worked. -->
+
+Yes, on the failure it targeted. The short-outfit caption went from 3 of 5 to 5 of 5 under the same scenario, measured the same way, before and after one prompt change. For example: *"Just scored these vintage Levi's 501 jeans for $38 on Depop. I'm keeping it simple with white sneakers for the ultimate casual street vibe."* Criteria 1–5 all stayed at 5/5, so nothing regressed.
+
+It also made the captions worse in a way none of my criteria measure. Almost all 30 cards in the after run follow one template: *"Scored this [item] for $N on [platform]. I'm wearing it with [list of the outfit pieces] for the ultimate … vibe."* Telling sentence 2 to use the outfit made the model list the outfit, so the second sentence reads like an inventory rather than a post. Before, the captions varied more and talked about the vibe. I fixed the count by fixing the structure, and the structure is now visible in every card. One side effect went the right way: because sentence 1 now asks for "the item's name", some cards use the exact title ("Y2K Baby Tee — Butterfly Print", "Platform Sneakers — White Chunky Sole"), where before none did.
 
 
 
@@ -382,6 +389,14 @@ I registered `search_listings` in `mcp_server.py`, with a two-sentence descripti
 <!-- For each criterion still missed: what you'd do, and why you stopped where
      you did. "I ran out of time" is fine if it's true. Pretending nothing is
      left is not. -->
+
+No criterion is missed, before or after. These are the problems the run showed that my criteria don't catch:
+
+1. **The captions are formulaic now.** The template above is the cost of my fix. Next I'd tell sentence 2 to pick *one* piece of the outfit and describe the feel, not list every piece. Then I'd add a criterion I can count, like "no two of five cards share the same second-sentence opening." I stopped here because Milestone 5 asks for one change measured properly, and a second prompt change would have mixed two effects in one after-run.
+2. **"Score this" instead of "Scored this"** appeared in 3 of 30 cards before (25 in the before run plus 5 in the short-outfit before run) and 4 of 30 after. My change didn't target it, and it didn't fix it. One line in the prompt ("write it in the past tense, as something I already bought") is the obvious next try, measured by counting "Score this" across a run.
+3. **The title still isn't used reliably.** My Tool Inventory says the card mentions the item's title. After the change some cards do and most still paraphrase it ("vintage Wrangler denim jacket"). Criterion 4 never checked the title. To measure it, I'd add a revision under criterion 4 (keeping the original line) that requires the exact `title`.
+4. **The keyword search can't tell "is a tee" from "goes with a tee".** `'graphic tee'` still returns low-rise cargo pants because their description says "layering with a long tee". It ranks below the real tees, so it never became the selected item in any run. Weighting the title and category above the description would fix it.
+5. **The query parser misses some phrasings.** "30 bucks" and "sz M" aren't recognised, so the search runs without that filter and nothing warns the user. My criterion 1 target (4 of 5) allows for this, but none of my scenarios uses those phrasings, so it was never tested.
 
 
 
