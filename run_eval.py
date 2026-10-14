@@ -37,7 +37,17 @@ import config
 import scenarios as scenario_module
 
 
-def run_once(scenario, use_trace=True):
+def query_for(scenario, attempt):
+    """
+    The query for this try. A scenario can list "queries" — one per try — when
+    the criterion is about different inputs (criterion 5 tests five sizes)
+    rather than the same input five times.
+    """
+    queries = scenario.get("queries")
+    return queries[(attempt - 1) % len(queries)] if queries else scenario["query"]
+
+
+def run_once(scenario, attempt=1, use_trace=True):
     """One scenario, one try. Returns everything worth recording."""
     from agent import run_agent
     from utils.data_loader import get_example_wardrobe, get_empty_wardrobe
@@ -50,9 +60,10 @@ def run_once(scenario, use_trace=True):
     if use_trace:
         trace_module.start_trace()
 
-    record = {"error": None, "session": None, "trace": "", "crashed": None}
+    record = {"error": None, "session": None, "trace": "", "crashed": None,
+              "query": query_for(scenario, attempt)}
     try:
-        record["session"] = run_agent(scenario["query"], wardrobe)
+        record["session"] = run_agent(record["query"], wardrobe)
     except Exception as exc:  # noqa: BLE001 — a crash is a result worth logging
         record["crashed"] = f"{type(exc).__name__}: {exc}"
         record["traceback"] = traceback.format_exc()
@@ -95,7 +106,7 @@ def main():
 
         tries = []
         for attempt in range(1, args.tries + 1):
-            record = run_once(scenario)
+            record = run_once(scenario, attempt)
             tries.append(record)
 
             if record["crashed"]:
@@ -186,7 +197,15 @@ def write_report(rows, args):
 
             session = record["session"] or {}
             item = session.get("selected_item") or {}
+            results = session.get("search_results") or []
+            if scenario.get("queries"):
+                lines += [f"- query: `{record['query']}`"]
             lines += [
+                # id and size of every result: criterion 3 compares the first
+                # id with selected_item, criterion 5 checks every size.
+                f"- search_results (id, size): "
+                + (", ".join(f"{r['id']} [{r['size']}]" for r in results) or "(none)"),
+                f"- selected_item id: {item.get('id', '(none)')}",
                 f"- stopped early: {'yes — ' + str(session.get('error')) if session.get('error') else 'no'}",
                 f"- selected_item: {item.get('title', '(none)')}"
                 + (f" (${item.get('price')}, {item.get('platform')})" if item else ""),

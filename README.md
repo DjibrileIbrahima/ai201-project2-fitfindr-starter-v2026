@@ -210,17 +210,25 @@ Scored these vintage Levi's 501 jeans on Depop for just $38 and they give off th
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. A matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. An impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. The searched item is the item every later tool receives | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. The fit card names the price and platform in two sentences | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. The size filter never returns the wrong size | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+
+Full log: [results/run_2026-10-13_1824_before.md](results/run_2026-10-13_1824_before.md). Cache off, temperature 0.9, 50 model calls.
 
 **Real output from one try**, pasted as text, naming the file and function
 that produced it:
 
-```
+Criterion 4, all five tries. Produced by `run_eval.py::main` running `agent.py::run_agent`; each caption is written by `tools.py::create_fit_card`. Query `denim jacket under $50`, selected item `lst_007` Denim Jacket — Light Wash, Cropped ($42.0, poshmark).
 
+```
+Try 1: Scored this vintage Wrangler denim jacket on Poshmark for just $42 and it gives the ultimate 90s streetwear vibe. Paired it with khakis and chunky sneakers for the easiest casual fit.
+Try 2: Scored this vintage Wrangler denim jacket on Poshmark for just $42 and it completely nails that effortless 90s streetwear vibe. The cropped light wash looks so good with wide-leg trousers for off-duty days.
+Try 3: Scored this vintage Wrangler denim jacket on Poshmark for just $42 and it completely nails that effortless 90s streetwear vibe. The cropped light wash looks so good paired with wide-leg trousers and chunky sneakers for casual everyday wear.
+Try 4: Score this vintage Wrangler denim jacket on Poshmark for only $42 and honestly the light wash cropped streetwear vibe is perfection. It looks so good paired with my go-to wide-leg khakis and chunky sneakers for an effortless off-duty fit.
+Try 5: Scored this vintage Wrangler denim jacket on Poshmark for just $42 and it completely nails that effortless 90s streetwear vibe. The cropped light wash looks so good with wide-leg trousers and sneakers for running around the city.
 ```
 
 ---
@@ -245,13 +253,19 @@ that produced it:
 
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | A matching query completes all three tools | 4 of 5 | MET (5/5) | All five tries show `stopped early: no` and a fit card in the session. |
+| 2 | An impossible query stops before the second tool | 5 of 5 | MET (5/5) | All five show `search_results: (none)`, a message naming the size and the wording to change, and a trace that ends at step [2] with no `suggest_outfit` step. |
+| 3 | The searched item is the item every later tool receives | 5 of 5 | MET (5/5) | In all five, `search_results[0]`, `selected_item` and the trace inputs to `suggest_outfit` [3] and `create_fit_card` [4] are all `lst_004`. |
+| 4 | The fit card names the price and platform in two sentences | 4 of 5 | MET (5/5) | I read each card: all five contain `$42` and "Poshmark", and each has exactly two sentences (two full stops, no other sentence breaks). |
+| 5 | The size filter never returns the wrong size | 5 of 5 | MET (5/5) | I checked every size in `search_results` for each of the five queries (S, M, L, 8, W30). Each contains the requested size as a whole token, and none is a `US` shoe size, a `One Size` or an `XL` for `L`. |
 
 **Diagnoses**
+
+No criterion missed, so there is no miss to diagnose. The run did show three things my criteria don't measure:
+
+1. **Criterion 4 passed here but failed in unit 3, and the input explains it.** In my unit 3 terminal tests, 2 of 4 captions came out as one long sentence joined with "and". Those tests passed `create_fit_card` short hand-written outfits (`'jeans and white sneakers'`, or a three-line placeholder list). In the loop, it gets the full numbered outfit from `suggest_outfit`, which gives the model something to fill a second sentence with. The tool and prompt are the same; the input was richer. My criterion only tested the real-loop path, so it can't see the short-input failure.
+2. **The caption ignores the item's title.** My Tool Inventory says `create_fit_card` mentions the item's `title`, but all five cards say "vintage Wrangler denim jacket" instead of "Denim Jacket — Light Wash, Cropped". It names the brand (which the prompt adds when there is one) and paraphrases the rest. That's a gap between the spec and the model's output, and criterion 4 doesn't check for the title, so it passed anyway.
+3. **"Score this" instead of "Scored this"** appears in 2 of the 10 captions in this run (criterion 1 try 1, criterion 4 try 4). It reads as an instruction rather than a post. It's a model-output problem, not a tool or state problem.
 
 
 

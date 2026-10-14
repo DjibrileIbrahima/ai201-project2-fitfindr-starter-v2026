@@ -24,9 +24,45 @@ SCENARIOS = [
     {
         # A query nothing can match. Criterion 2 — the branch.
         "name": "impossible query stops early",
-        "query": "designer ballgown size XXS under $5",
+        "query": "leather cowboy boots size US 12",
         "wardrobe": "example",
         "criterion": 2,
+    },
+    {
+        # Criterion 3 — state. PASS when the trace's suggest_outfit and
+        # create_fit_card inputs show the same id as selected_item, and that
+        # id is the first one in search_results.
+        "name": "searched item reaches every later tool",
+        "query": "90s track jacket in size M",
+        "wardrobe": "example",
+        "criterion": 3,
+    },
+    {
+        # Criterion 4 — the fit card. The same query five times, so the only
+        # thing varying is the model. PASS when the card has the price as $NN,
+        # the platform, and exactly two sentences.
+        "name": "fit card names price and platform in two sentences",
+        "query": "denim jacket under $50",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    {
+        # Criterion 5 — sizes. Five different sizes, one per try. "vintage"
+        # matches almost every listing, so the size filter does all the
+        # work. The US 8 shoe isn't tagged vintage, hence "sneakers" there.
+        # PASS when every size in search_results contains the requested size
+        # as a whole token.
+        "name": "size filter returns only the requested size",
+        "query": "vintage size S",
+        "queries": [
+            "vintage size S",
+            "vintage size M",
+            "vintage size L",
+            "sneakers size 8",
+            "vintage size W30",
+        ],
+        "wardrobe": "example",
+        "criterion": 5,
     },
     {
         # A user with nothing saved. One of unit 4's three failure modes.
@@ -35,18 +71,6 @@ SCENARIOS = [
         "wardrobe": "empty",
         "criterion": None,
     },
-    # TODO: add what your criteria 3, 4 and 5 need.
-    #
-    # Set "criterion" to the number in criteria.md that the scenario tests.
-    # "criterion": None means a diagnostic run — useful to have, but it isn't
-    # one of your five, and run_eval.py marks it as such in the table.
-    #
-    # For a state criterion, any normal query works — what you're checking is
-    # what ends up in the session, not what the user typed.
-    #
-    # For a fit-card criterion, you probably want the SAME query listed more
-    # than once, or several different items, depending on what your criterion
-    # actually says.
 ]
 
 WARDROBES = ("example", "empty")
